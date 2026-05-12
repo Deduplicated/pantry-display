@@ -1,0 +1,11 @@
+# Pantry Display — Python dependencies
+#
+# Install with:
+#   pip install -r requirements.txt
+#
+# The Waveshare e-paper library is NOT on PyPI and must be installed
+# separately from the manufacturer's GitHub repository.
+# See README.md for full instructions.
+
+flask>=3.0,<4.0
+pillow>=10.0,<12.0

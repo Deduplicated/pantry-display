@@ -1,0 +1,24 @@
+# Virtual environment
+.venv/
+venv/
+
+# Local SQLite database (each Pi keeps its own)
+pantry.db
+
+# Generated preview image (dev mode)
+preview.png
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/

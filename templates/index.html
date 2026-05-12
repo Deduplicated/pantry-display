@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Pantry Display</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header class="site-header">
+    <h1>Pantry Display</h1>
+    <button id="btn-refresh" class="btn btn-ghost" title="Refresh e-paper display">
+      &#8635; Refresh display
+    </button>
+  </header>
+
+  <!-- ===== Add item form ===== -->
+  <section class="card add-form" id="add-form-section">
+    <h2>Add item</h2>
+    <form id="add-form" novalidate>
+
+      <label for="select-produce">Produce</label>
+      <select id="select-produce" name="produce" required>
+        <option value="">— choose or type below —</option>
+        {% for name in produce_defaults | sort %}
+        <option value="{{ name }}">{{ name }}</option>
+        {% endfor %}
+        <option value="__custom__">Other…</option>
+      </select>
+
+      <!-- Shown only when "Other…" is selected -->
+      <div id="custom-name-row" class="hidden">
+        <label for="input-custom-name">Custom name</label>
+        <input id="input-custom-name" type="text" placeholder="e.g. Mango" maxlength="60" />
+      </div>
+
+      <label for="input-expiry">Expiry date</label>
+      <input id="input-expiry" type="date" name="expiry_date" required />
+
+      <p class="hint" id="expiry-hint"></p>
+
+      <button type="submit" class="btn btn-primary">Add to pantry</button>
+    </form>
+  </section>
+
+  <!-- ===== Toast notification ===== -->
+  <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
+
+  <!-- ===== Items list ===== -->
+  <section class="card items-section">
+    <h2>Current items <span id="item-count" class="badge"></span></h2>
+
+    <div id="items-list">
+      <p class="placeholder">Loading…</p>
+    </div>
+  </section>
+
+  <!-- ===== Dev-mode preview ===== -->
+  <section class="card preview-section" id="preview-section" style="display:none">
+    <h2>Display preview</h2>
+    <img id="preview-img" src="/preview.png" alt="E-paper display preview" />
+    <p class="hint">This preview updates each time the display is refreshed.</p>
+  </section>
+
+  <!-- Pass Jinja data to JS as a JSON object embedded in the page -->
+  <script>
+    window.PRODUCE_DEFAULTS = {{ produce_defaults | tojson }};
+  </script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
