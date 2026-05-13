@@ -239,7 +239,7 @@ def push_to_display(img: Image.Image) -> None:
         print(f"[display] ERROR updating e-paper: {exc}")
         raise
     finally:
-        epd_driver.epdconfig.module_exit(cleanup=True)
+        epd_driver.epdconfig.module_exit(cleanup=False)
 
 
 # ---------------------------------------------------------------------------
