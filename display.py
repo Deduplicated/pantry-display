@@ -159,7 +159,6 @@ TITLE_H       = 48   # height reserved for the main title
 SECTION_H     = 32   # height of a section header row
 ITEM_H        = 32   # height of an item row (extra space for date padding)
 FOOTER_H      = 24   # height of the footer line
-COL_HEADER_Y_OFFSET = 4
 COL_HEADER_ROW_H    = 22   # height for header text
 COL_HEADER_GAP      = 14   # space below headers before section bar
 COL_USE_BY_X  = 500  # Use By column
