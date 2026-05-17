@@ -221,28 +221,72 @@ h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 14px; }
 .group--this-week .group-dot { background: var(--color-this-week); }
 .group--fresh     .group-dot { background: var(--color-fresh); }
 
+.item-name {
+  flex: 1;
+  font-size: 0.98rem;
+  font-weight: 500;
+  min-width: 0;
+}
+
+.items-columns-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 4px;
+}
+
+.items-columns-header .col-name { flex: 1; min-width: 0; }
+.items-columns-header .col-use-by,
+.items-columns-header .col-expiry {
+  width: 4.5rem;
+  text-align: right;
+}
+.items-columns-header .col-actions { width: 5.5rem; }
+
 .item-row {
   display: flex;
   align-items: center;
   padding: 9px 0;
   border-bottom: 1px solid var(--color-border);
-  gap: 8px;
+  gap: 6px;
 }
 
 .item-row:last-child { border-bottom: none; }
 
-.item-name {
-  flex: 1;
-  font-size: 0.98rem;
-  font-weight: 500;
-}
-
-.item-days {
-  font-size: 0.85rem;
+.item-date {
+  font-size: 0.82rem;
   color: var(--color-muted);
   white-space: nowrap;
-  margin-right: 4px;
+  width: 4.5rem;
+  text-align: right;
+  flex-shrink: 0;
 }
+
+.item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 5.5rem;
+}
+
+.btn-edit {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  padding: 5px 8px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+}
+
+.btn-edit:active { background: #eef5ee; }
 
 /* --- Toast --------------------------------------------------------- */
 .toast {

@@ -1,0 +1,14 @@
+[Unit]
+Description=Pantry Display Flask App
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/pantry-display
+Environment=PATH=/home/pi/pantry-display/.venv/bin
+ExecStart=/home/pi/pantry-display/.venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

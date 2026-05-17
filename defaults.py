@@ -1,3 +1,6 @@
+# Days before expiry_date to set use_by_date when the user does not override it.
+USE_BY_OFFSET_DAYS = 2
+
 # Default produce items with typical refrigerator/counter shelf life in days.
 # These are used to auto-fill the expiry date when adding a new item.
 # Adjust values to match your own experience with freshness.

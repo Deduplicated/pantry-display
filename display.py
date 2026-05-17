@@ -19,7 +19,9 @@ Driver modules live in the waveshare_epd package installed from:
 
 import os
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+
+from defaults import USE_BY_OFFSET_DAYS
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -88,14 +90,25 @@ def _days_remaining(expiry_date_str: str) -> int:
     return (expiry - date.today()).days
 
 
-def _group_items(items: list[dict]) -> dict[str, list[tuple[str, int]]]:
+def _use_by_for_item(item: dict) -> str:
+    """Resolve use_by_date, including legacy rows without the column."""
+    if item.get("use_by_date"):
+        return item["use_by_date"]
+    expiry = date.fromisoformat(item["expiry_date"])
+    return (expiry - timedelta(days=USE_BY_OFFSET_DAYS)).isoformat()
+
+
+def _format_date(iso_str: str) -> str:
+    """Short date for the display, e.g. 13 May."""
+    return date.fromisoformat(iso_str).strftime("%d %b")
+
+
+def _group_items(items: list[dict]) -> dict[str, list[tuple[str, str, str, int]]]:
     """
-    Sort items into display groups.
-    Returns an ordered dict:
-      { "EXPIRED": [...], "USE FIRST": [...], "THIS WEEK": [...], "FRESH": [...] }
-    Each list contains (name, days_remaining) tuples, sorted by days ascending.
+    Sort items into display groups by expiry urgency.
+    Each entry is (name, use_by_date, expiry_date, days_until_expiry).
     """
-    groups: dict[str, list[tuple[str, int]]] = {
+    groups: dict[str, list[tuple[str, str, str, int]]] = {
         "EXPIRED":   [],
         "USE FIRST": [],
         "THIS WEEK": [],
@@ -103,7 +116,8 @@ def _group_items(items: list[dict]) -> dict[str, list[tuple[str, int]]]:
     }
     for item in items:
         days = _days_remaining(item["expiry_date"])
-        entry = (item["name"], days)
+        use_by = _use_by_for_item(item)
+        entry = (item["name"], use_by, item["expiry_date"], days)
         if days < 0:
             groups["EXPIRED"].append(entry)
         elif days <= 2:
@@ -113,9 +127,8 @@ def _group_items(items: list[dict]) -> dict[str, list[tuple[str, int]]]:
         else:
             groups["FRESH"].append(entry)
 
-    # Sort each group by days ascending (most urgent first within group)
     for key in groups:
-        groups[key].sort(key=lambda x: x[1])
+        groups[key].sort(key=lambda x: x[3])
 
     return groups
 
@@ -130,19 +143,13 @@ TITLE_H       = 48   # height reserved for the main title
 SECTION_H     = 32   # height of a section header row
 ITEM_H        = 28   # height of an item row
 FOOTER_H      = 24   # height of the footer line
-COL_DAYS_X    = 560  # x-position for the days-remaining column
+COL_HEADER_Y_OFFSET = 4
+COL_USE_BY_X  = 500  # Use By column
+COL_EXPIRY_X  = 640  # Expiry Date column
+NAME_MAX_LEN  = 18   # shorter names to fit two date columns
 
 # Maximum items we will render before truncating (keeps layout from overflowing)
-MAX_ITEMS = 14
-
-
-def _days_label(days: int) -> str:
-    if days < 0:
-        n = abs(days)
-        return f"expired {n} day{'s' if n != 1 else ''} ago"
-    if days == 0:
-        return "expires today"
-    return f"{days} day{'s' if days != 1 else ''}"
+MAX_ITEMS = 12
 
 
 def render_image(items: list[dict]) -> Image.Image:
@@ -165,6 +172,11 @@ def render_image(items: list[dict]) -> Image.Image:
     # Thin horizontal rule under the title
     draw.line([(MARGIN_X, y - 4), (WIDTH - MARGIN_X, y - 4)], fill=0, width=2)
 
+    # Column headers (Use By | Expiry Date)
+    draw.text((COL_USE_BY_X, y + COL_HEADER_Y_OFFSET), "Use By", font=FONT_SMALL, fill=0)
+    draw.text((COL_EXPIRY_X, y + COL_HEADER_Y_OFFSET), "Expiry date", font=FONT_SMALL, fill=0)
+    y += 22
+
     # --- Sections ---
     total_rendered = 0
     for section_name, entries in groups.items():
@@ -181,7 +193,7 @@ def render_image(items: list[dict]) -> Image.Image:
         draw.text((MARGIN_X + 6, y + 4), section_name, font=FONT_SECTION, fill=1)
         y += SECTION_H
 
-        for name, days in entries:
+        for name, use_by, expiry, _days in entries:
             if total_rendered >= MAX_ITEMS:
                 # Indicate truncation
                 draw.text((MARGIN_X + 8, y), "  … more items …", font=FONT_SMALL, fill=0)
@@ -195,12 +207,10 @@ def render_image(items: list[dict]) -> Image.Image:
                 break
 
             # Item name (truncate long names)
-            display_name = name if len(name) <= 22 else name[:20] + "…"
+            display_name = name if len(name) <= NAME_MAX_LEN else name[: NAME_MAX_LEN - 1] + "…"
             draw.text((MARGIN_X + 8, y + 2), display_name, font=FONT_ITEM, fill=0)
-
-            # Days label right-aligned relative to COL_DAYS_X
-            label = _days_label(days)
-            draw.text((COL_DAYS_X, y + 2), label, font=FONT_ITEM, fill=0)
+            draw.text((COL_USE_BY_X, y + 2), _format_date(use_by), font=FONT_ITEM, fill=0)
+            draw.text((COL_EXPIRY_X, y + 2), _format_date(expiry), font=FONT_ITEM, fill=0)
 
             y += ITEM_H
             total_rendered += 1
@@ -256,16 +266,24 @@ def refresh_display(items: list[dict]) -> None:
 # CLI usage: python display.py
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    from datetime import timedelta
     today = date.today()
 
     # Quick smoke-test with dummy data
+    def _row(name, exp_offset):
+        exp = today + timedelta(days=exp_offset)
+        use = exp - timedelta(days=2)
+        return {
+            "name": name,
+            "expiry_date": str(exp),
+            "use_by_date": str(use),
+        }
+
     sample = [
-        {"name": "Spinach",      "expiry_date": str(today + timedelta(days=1))},
-        {"name": "Strawberries", "expiry_date": str(today)},
-        {"name": "Avocados",     "expiry_date": str(today + timedelta(days=4))},
-        {"name": "Tomatoes",     "expiry_date": str(today + timedelta(days=6))},
-        {"name": "Carrots",      "expiry_date": str(today + timedelta(days=12))},
-        {"name": "Potatoes",     "expiry_date": str(today + timedelta(days=28))},
+        _row("Spinach", 1),
+        _row("Strawberries", 0),
+        _row("Avocados", 4),
+        _row("Tomatoes", 6),
+        _row("Carrots", 12),
+        _row("Potatoes", 28),
     ]
     refresh_display(sample)

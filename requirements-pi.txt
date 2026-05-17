@@ -1,0 +1,12 @@
+# Extra Python packages for Raspberry Pi (install inside .venv after requirements.txt):
+#
+#   pip install -r requirements.txt
+#   pip install spidev gpiozero lgpio
+#   cd ~/e-Paper/RaspberryPi_JetsonNano/python && pip install .
+#
+# System packages (apt):
+#   sudo apt install -y liblgpio-dev swig fonts-liberation
+
+spidev>=3.5
+gpiozero>=2.0
+lgpio>=0.2.2.0

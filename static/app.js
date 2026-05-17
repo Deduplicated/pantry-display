@@ -1,17 +1,6 @@
-/* app.js — Pantry Display frontend logic
- *
- * Responsibilities:
- *  - Load and render the items list from /api/items
- *  - Auto-fill expiry date when a produce item is selected
- *  - Handle the Add form submission (POST /api/items)
- *  - Handle Delete buttons (DELETE /api/items/<id>)
- *  - Handle the manual Refresh Display button (POST /api/refresh-display)
- *  - Show a dev-mode display preview if running without hardware
- */
+/* app.js — Pantry Display frontend logic */
 
 "use strict";
-
-// PRODUCE_DEFAULTS is injected by Flask via index.html as window.PRODUCE_DEFAULTS
 
 // ---------------------------------------------------------------------------
 // Utility helpers
@@ -27,19 +16,30 @@ function addDaysToToday(days) {
   return d.toISOString().slice(0, 10);
 }
 
-function daysUntil(isoDate) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const expiry = new Date(isoDate); expiry.setHours(0, 0, 0, 0);
-  return Math.round((expiry - today) / 86400000);
+function subtractDaysFromIso(isoDate, days) {
+  const d = new Date(isoDate + "T12:00:00");
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
 }
 
-function daysLabel(days) {
-  if (days < 0) {
-    const n = Math.abs(days);
-    return `expired ${n} day${n !== 1 ? "s" : ""} ago`;
-  }
-  if (days === 0) return "expires today";
-  return `${days} day${days !== 1 ? "s" : ""}`;
+function daysUntil(isoDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(isoDate + "T12:00:00");
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target - today) / 86400000);
+}
+
+function formatDisplayDate(isoDate) {
+  if (!isoDate) return "—";
+  const d = new Date(isoDate + "T12:00:00");
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function resolveUseBy(item) {
+  if (item.use_by_date) return item.use_by_date;
+  const offset = window.USE_BY_OFFSET_DAYS ?? 2;
+  return subtractDaysFromIso(item.expiry_date, offset);
 }
 
 function showToast(msg, isError = false) {
@@ -55,16 +55,22 @@ function showToast(msg, isError = false) {
 // ---------------------------------------------------------------------------
 
 const GROUP_ORDER = ["EXPIRED", "USE FIRST", "THIS WEEK", "FRESH"];
-const GROUP_SLUG  = { "EXPIRED": "expired", "USE FIRST": "use-first", "THIS WEEK": "this-week", "FRESH": "fresh" };
+const GROUP_SLUG = {
+  EXPIRED: "expired",
+  "USE FIRST": "use-first",
+  "THIS WEEK": "this-week",
+  FRESH: "fresh",
+};
 
 function groupItems(items) {
-  const groups = { "EXPIRED": [], "USE FIRST": [], "THIS WEEK": [], "FRESH": [] };
+  const groups = { EXPIRED: [], "USE FIRST": [], "THIS WEEK": [], FRESH: [] };
   for (const item of items) {
     const days = daysUntil(item.expiry_date);
-    if (days < 0)      groups["EXPIRED"].push({ ...item, days });
-    else if (days <= 2) groups["USE FIRST"].push({ ...item, days });
-    else if (days <= 7) groups["THIS WEEK"].push({ ...item, days });
-    else               groups["FRESH"].push({ ...item, days });
+    const enriched = { ...item, days, use_by: resolveUseBy(item) };
+    if (days < 0) groups.EXPIRED.push(enriched);
+    else if (days <= 2) groups["USE FIRST"].push(enriched);
+    else if (days <= 7) groups["THIS WEEK"].push(enriched);
+    else groups.FRESH.push(enriched);
   }
   return groups;
 }
@@ -72,28 +78,29 @@ function groupItems(items) {
 function renderItems(items) {
   const container = document.getElementById("items-list");
   const countBadge = document.getElementById("item-count");
+  const header = document.querySelector(".items-columns-header");
 
   countBadge.textContent = items.length;
+  if (header) header.style.display = items.length ? "" : "none";
 
   if (items.length === 0) {
-    container.innerHTML = '<p class="placeholder">No items yet — add something above.</p>';
+    container.innerHTML =
+      '<p class="placeholder">No items yet — add something above.</p>';
     return;
   }
 
   const groups = groupItems(items);
-  const frag   = document.createDocumentFragment();
+  const frag = document.createDocumentFragment();
 
   for (const groupName of GROUP_ORDER) {
     const entries = groups[groupName];
     if (entries.length === 0) continue;
 
-    // Group header
-    const header = document.createElement("div");
-    header.className = `group-header group--${GROUP_SLUG[groupName]}`;
-    header.innerHTML = `<span class="group-dot"></span>${groupName}`;
-    frag.appendChild(header);
+    const headerEl = document.createElement("div");
+    headerEl.className = `group-header group--${GROUP_SLUG[groupName]}`;
+    headerEl.innerHTML = `<span class="group-dot"></span>${groupName}`;
+    frag.appendChild(headerEl);
 
-    // Item rows
     for (const item of entries) {
       const row = document.createElement("div");
       row.className = "item-row";
@@ -103,19 +110,38 @@ function renderItems(items) {
       name.className = "item-name";
       name.textContent = item.name;
 
-      const label = document.createElement("span");
-      label.className = "item-days";
-      label.textContent = daysLabel(item.days);
+      const useBy = document.createElement("span");
+      useBy.className = "item-date col-use-by";
+      useBy.textContent = formatDisplayDate(item.use_by);
+
+      const expiry = document.createElement("span");
+      expiry.className = "item-date col-expiry";
+      expiry.textContent = formatDisplayDate(item.expiry_date);
+
+      const actions = document.createElement("div");
+      actions.className = "item-actions";
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "btn btn-edit";
+      editBtn.textContent = "Edit";
+      editBtn.setAttribute("aria-label", `Edit dates for ${item.name}`);
+      editBtn.addEventListener("click", () => openEditDates(item));
 
       const delBtn = document.createElement("button");
+      delBtn.type = "button";
       delBtn.className = "btn btn-delete";
       delBtn.textContent = "Delete";
       delBtn.setAttribute("aria-label", `Delete ${item.name}`);
       delBtn.addEventListener("click", () => deleteItem(item.id, item.name));
 
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+
       row.appendChild(name);
-      row.appendChild(label);
-      row.appendChild(delBtn);
+      row.appendChild(useBy);
+      row.appendChild(expiry);
+      row.appendChild(actions);
       frag.appendChild(row);
     }
   }
@@ -141,15 +167,32 @@ async function loadItems() {
   }
 }
 
-async function addItem(name, expiryDate) {
+async function addItem(name, expiryDate, useByDate) {
   const res = await fetch("/api/items", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, expiry_date: expiryDate }),
+    body: JSON.stringify({
+      name,
+      expiry_date: expiryDate,
+      use_by_date: useByDate,
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Failed to add item");
+  }
+  return res.json();
+}
+
+async function patchItem(id, payload) {
+  const res = await fetch(`/api/items/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Update failed");
   }
   return res.json();
 }
@@ -167,6 +210,32 @@ async function deleteItem(id, name) {
   }
 }
 
+function openEditDates(item) {
+  const useByDefault = resolveUseBy(item);
+  const useByInput = prompt(
+    "Use by date (YYYY-MM-DD):",
+    item.use_by_date || useByDefault
+  );
+  if (useByInput === null) return;
+
+  const expiryInput = prompt(
+    "Expiry date (YYYY-MM-DD):",
+    item.expiry_date
+  );
+  if (expiryInput === null) return;
+
+  patchItem(item.id, {
+    use_by_date: useByInput.trim(),
+    expiry_date: expiryInput.trim(),
+  })
+    .then(() => {
+      showToast(`"${item.name}" updated`);
+      loadItems();
+      refreshPreview();
+    })
+    .catch((err) => showToast(err.message, true));
+}
+
 async function triggerDisplayRefresh() {
   const btn = document.getElementById("btn-refresh");
   btn.disabled = true;
@@ -174,7 +243,7 @@ async function triggerDisplayRefresh() {
   try {
     await fetch("/api/refresh-display", { method: "POST" });
     showToast("Display refresh triggered");
-    setTimeout(refreshPreview, 1500); // give the render a moment
+    setTimeout(refreshPreview, 1500);
   } catch {
     showToast("Refresh failed", true);
   } finally {
@@ -183,19 +252,12 @@ async function triggerDisplayRefresh() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Dev-mode preview
-// ---------------------------------------------------------------------------
-
 function refreshPreview() {
   const img = document.getElementById("preview-img");
   if (!img) return;
-  // Cache-bust so the browser always fetches the latest PNG
   img.src = `/preview.png?t=${Date.now()}`;
 }
 
-// Show the preview section — we always show it so users can see the layout
-// even when real hardware is attached (useful for verifying render output).
 function initPreview() {
   const section = document.getElementById("preview-section");
   if (section) section.style.display = "";
@@ -206,38 +268,56 @@ function initPreview() {
 // ---------------------------------------------------------------------------
 
 function initForm() {
-  const selectEl      = document.getElementById("select-produce");
-  const customRow     = document.getElementById("custom-name-row");
-  const customNameEl  = document.getElementById("input-custom-name");
-  const expiryEl      = document.getElementById("input-expiry");
-  const hintEl        = document.getElementById("expiry-hint");
-  const form          = document.getElementById("add-form");
+  const selectEl = document.getElementById("select-produce");
+  const customRow = document.getElementById("custom-name-row");
+  const customNameEl = document.getElementById("input-custom-name");
+  const useByEl = document.getElementById("input-use-by");
+  const expiryEl = document.getElementById("input-expiry");
+  const hintEl = document.getElementById("expiry-hint");
+  const form = document.getElementById("add-form");
 
-  // Set min date to today so past dates are blocked
+  let useByManual = false;
+  const offset = () => window.USE_BY_OFFSET_DAYS ?? 2;
+
+  function syncUseByFromExpiry() {
+    if (useByManual || !expiryEl.value) return;
+    useByEl.value = subtractDaysFromIso(expiryEl.value, offset());
+  }
+
   expiryEl.min = isoToday();
+
+  useByEl.addEventListener("input", () => {
+    useByManual = true;
+  });
+
+  expiryEl.addEventListener("change", syncUseByFromExpiry);
+  expiryEl.addEventListener("input", syncUseByFromExpiry);
 
   selectEl.addEventListener("change", () => {
     const val = selectEl.value;
+    useByManual = false;
 
     if (val === "__custom__") {
       customRow.classList.remove("hidden");
       customNameEl.required = true;
       expiryEl.value = "";
+      useByEl.value = "";
       hintEl.textContent = "";
       return;
     }
 
     customRow.classList.add("hidden");
     customNameEl.required = false;
-    customNameEl.value    = "";
+    customNameEl.value = "";
 
     if (val && window.PRODUCE_DEFAULTS[val] !== undefined) {
-      const days     = window.PRODUCE_DEFAULTS[val];
-      const date     = addDaysToToday(days);
-      expiryEl.value = date;
+      const days = window.PRODUCE_DEFAULTS[val];
+      expiryEl.value = addDaysToToday(days);
+      syncUseByFromExpiry();
       hintEl.textContent = `Default shelf life: ${days} day${days !== 1 ? "s" : ""}`;
     } else {
-      expiryEl.value    = "";
+      expiryEl.value = "";
+      useByEl.value = "";
       hintEl.textContent = "";
     }
   });
@@ -262,9 +342,15 @@ function initForm() {
     }
 
     const expiryDate = expiryEl.value;
+    const useByDate = useByEl.value;
     if (!expiryDate) {
       expiryEl.focus();
       showToast("Please set an expiry date", true);
+      return;
+    }
+    if (!useByDate) {
+      useByEl.focus();
+      showToast("Please set a use by date", true);
       return;
     }
 
@@ -273,14 +359,12 @@ function initForm() {
     submitBtn.textContent = "Adding…";
 
     try {
-      await addItem(name, expiryDate);
+      await addItem(name, expiryDate, useByDate);
       showToast(`"${name}" added`);
-
-      // Reset form
       form.reset();
       customRow.classList.add("hidden");
+      useByManual = false;
       hintEl.textContent = "";
-
       loadItems();
       refreshPreview();
     } catch (err) {
@@ -292,14 +376,11 @@ function initForm() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Init
-// ---------------------------------------------------------------------------
-
 document.addEventListener("DOMContentLoaded", () => {
   initForm();
   initPreview();
   loadItems();
-
-  document.getElementById("btn-refresh").addEventListener("click", triggerDisplayRefresh);
+  document
+    .getElementById("btn-refresh")
+    .addEventListener("click", triggerDisplayRefresh);
 });

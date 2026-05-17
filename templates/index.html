@@ -38,6 +38,10 @@
         <input id="input-custom-name" type="text" placeholder="e.g. Mango" maxlength="60" />
       </div>
 
+      <label for="input-use-by">Use by</label>
+      <input id="input-use-by" type="date" name="use_by_date" required />
+      <p class="hint" id="use-by-hint">Defaults to {{ use_by_offset_days }} days before expiry — you can change it.</p>
+
       <label for="input-expiry">Expiry date</label>
       <input id="input-expiry" type="date" name="expiry_date" required />
 
@@ -54,6 +58,13 @@
   <section class="card items-section">
     <h2>Current items <span id="item-count" class="badge"></span></h2>
 
+    <div class="items-columns-header" aria-hidden="true">
+      <span class="col-name">Item</span>
+      <span class="col-use-by">Use by</span>
+      <span class="col-expiry">Expiry date</span>
+      <span class="col-actions"></span>
+    </div>
+
     <div id="items-list">
       <p class="placeholder">Loading…</p>
     </div>
@@ -69,6 +80,7 @@
   <!-- Pass Jinja data to JS as a JSON object embedded in the page -->
   <script>
     window.PRODUCE_DEFAULTS = {{ produce_defaults | tojson }};
+    window.USE_BY_OFFSET_DAYS = {{ use_by_offset_days }};
   </script>
   <script src="/static/app.js"></script>
 </body>

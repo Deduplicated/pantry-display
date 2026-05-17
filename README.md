@@ -6,10 +6,12 @@ A local-network kitchen display that shows fresh produce sorted by expiry date o
 
 ## Hardware
 
-| Component | Notes |
-|-----------|-------|
-| Raspberry Pi Zero 2 W / WH | Any Pi with 40-pin header works |
-| Waveshare 7.5" e-Paper HAT (v2) | 800 × 480, black & white |
+
+| Component                       | Notes                           |
+| ------------------------------- | ------------------------------- |
+| Raspberry Pi Zero 2 W / WH      | Any Pi with 40-pin header works |
+| Waveshare 7.5" e-Paper HAT (v2) | 800 × 480, black & white        |
+
 
 ---
 
@@ -66,10 +68,25 @@ ls /dev/spi*
 
 ### 3. Install system dependencies
 
+On **Debian Bookworm / Trixie** (current Raspberry Pi OS), some older package names no longer exist:
+
+- `libtiff5` was replaced by `**libtiff6`**
+- `**libatlas-base-dev`** is gone and **not needed** here — NumPy/Pillow install from pre-built wheels for this app
+
+Install the essentials plus common Pillow image libraries (harmless if already present):
+
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3 python3-pip python3-venv git \
-    libopenjp2-7 libtiff5 libatlas-base-dev fonts-liberation
+sudo apt install -y python3 python3-pip python3-venv git fonts-liberation \
+    libopenjp2-7 libtiff6 zlib1g libjpeg62-turbo
+```
+
+If `apt` reports that `libopenjp2-7` has no candidate (some releases use a `t64` rename), install the suggested alternative it prints, or omit it — the PyPI **Pillow** wheel usually bundles what it needs for basic use.
+
+Minimal install (often enough when using `pip install pillow` wheels):
+
+```bash
+sudo apt install -y python3 python3-venv git fonts-liberation
 ```
 
 ### 4. Clone or copy this project onto the Pi
@@ -134,96 +151,52 @@ Open `http://pantry.local:5000` from your phone.
 
 ---
 
-## Run as a systemd service (auto-start on boot)
+## Raspberry Pi hardware Python packages
 
-Create the service file:
-
-```bash
-sudo nano /etc/systemd/system/pantry-display.service
-```
-
-Paste the following (adjust paths if your username is not `pi`):
-
-```ini
-[Unit]
-Description=Pantry Display Flask App
-After=network.target
-
-[Service]
-User=pi
-WorkingDirectory=/home/pi/pantry-display
-ExecStart=/home/pi/pantry-display/.venv/bin/python app.py
-Restart=on-failure
-RestartSec=5
-# Remove the line below when running with real e-paper hardware
-Environment=DEV_MODE=1
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start the service:
+After `pip install -r requirements.txt`, install the e-paper extras (inside your venv):
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable pantry-display
-sudo systemctl start pantry-display
-sudo systemctl status pantry-display
+pip install -r requirements-pi.txt
+cd ~/e-Paper/RaspberryPi_JetsonNano/python && pip install .
 ```
+
+If `lgpio` fails to build, install `sudo apt install -y swig liblgpio-dev` first.
 
 ---
 
-## Daily display refresh (countdown updates)
+## Run constantly (systemd + daily refresh)
 
-The display auto-refreshes when items are added or deleted. To also update the day-countdown each morning, add a scheduled job.
+The app refreshes the e-paper when you add or delete items. A **daily timer** at 07:00 updates the dates on the panel even if nothing changed.
 
-### Option A — cron
-
-```bash
-crontab -e
-```
-
-Add this line to refresh the display at 07:00 every day:
-
-```cron
-0 7 * * * /home/pi/pantry-display/.venv/bin/python -c "import db, display; db.init_db(); display.refresh_display(db.get_all_items())"
-```
-
-### Option B — systemd timer
-
-Create `/etc/systemd/system/pantry-refresh.service`:
-
-```ini
-[Unit]
-Description=Pantry Display daily refresh
-
-[Service]
-User=pi
-WorkingDirectory=/home/pi/pantry-display
-ExecStart=/home/pi/pantry-display/.venv/bin/python -c \
-    "import db, display; db.init_db(); display.refresh_display(db.get_all_items())"
-```
-
-Create `/etc/systemd/system/pantry-refresh.timer`:
-
-```ini
-[Unit]
-Description=Run Pantry Display refresh daily at 07:00
-
-[Timer]
-OnCalendar=*-*-* 07:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-```
-
-Enable the timer:
+From the project directory on the Pi:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now pantry-refresh.timer
+cd ~/pantry-display
+git pull
+sudo bash deploy/install-services.sh
+```
+
+This installs:
+
+- `pantry-display.service` — Flask on port 5000, starts on boot, restarts on failure
+- `pantry-refresh.timer` — runs `scripts/daily_refresh.py` every day at 07:00
+
+Do **not** set `DEV_MODE=1` in the service when using the real HAT.
+
+Check status:
+
+```bash
+sudo systemctl status pantry-display
 sudo systemctl list-timers pantry-refresh.timer
+sudo journalctl -u pantry-display -f
+```
+
+To stop the manual `python app.py` session first (only one process should bind port 5000):
+
+```bash
+sudo systemctl stop pantry-display   # if testing manually
+# or Ctrl+C in the terminal running python app.py, then:
+sudo systemctl start pantry-display
 ```
 
 ---
@@ -256,3 +229,4 @@ sudo journalctl -u pantry-display -f
 rm ~/pantry-display/pantry.db
 python app.py   # recreates the table on startup
 ```
+
