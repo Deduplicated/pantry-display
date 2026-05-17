@@ -160,6 +160,8 @@ SECTION_H     = 32   # height of a section header row
 ITEM_H        = 32   # height of an item row (extra space for date padding)
 FOOTER_H      = 24   # height of the footer line
 COL_HEADER_Y_OFFSET = 4
+COL_HEADER_ROW_H    = 22   # height for header text
+COL_HEADER_GAP      = 14   # space below headers before section bar
 DATE_Y_OFFSET = 6    # push dates down slightly within each row
 COL_USE_BY_X  = 500  # Use By column
 COL_EXPIRY_X  = 640  # Expiry Date column
@@ -192,7 +194,7 @@ def render_image(items: list[dict]) -> Image.Image:
     # Column headers (Use By | Expiry Date)
     draw.text((COL_USE_BY_X, y + COL_HEADER_Y_OFFSET), "Use By", font=FONT_COL_HDR, fill=0)
     draw.text((COL_EXPIRY_X, y + COL_HEADER_Y_OFFSET), "Expiry date", font=FONT_COL_HDR, fill=0)
-    y += 22
+    y += COL_HEADER_ROW_H + COL_HEADER_GAP
 
     # --- Sections ---
     total_rendered = 0

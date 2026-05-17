@@ -232,14 +232,14 @@ h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 14px; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 0 8px;
+  padding: 0 0 14px;
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-muted);
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: 4px;
+  margin-bottom: 10px;
 }
 
 .items-columns-header .col-name { flex: 1; min-width: 0; }
