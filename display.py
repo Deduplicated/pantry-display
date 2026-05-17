@@ -40,17 +40,31 @@ HEIGHT = 480
 # ---------------------------------------------------------------------------
 # Dev-mode detection
 # ---------------------------------------------------------------------------
+# systemd often sets PATH to only the venv; waveshare's epdconfig runs `cat` and
+# `grep` to detect a Raspberry Pi. Without /usr/bin it wrongly picks Jetson.
+_STANDARD_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+
+def _ensure_system_path() -> None:
+    path = os.environ.get("PATH", "")
+    if "/usr/bin" not in path.split(os.pathsep):
+        os.environ["PATH"] = _STANDARD_PATH + (
+            (os.pathsep + path) if path else ""
+        )
+
+
 # We are in dev mode if:
 #   1. The DEV_MODE env var is set to a truthy value, OR
 #   2. The waveshare_epd package cannot be imported (not running on Pi)
 DEV_MODE = os.environ.get("DEV_MODE", "0").strip() not in ("0", "false", "False", "")
 
 if not DEV_MODE:
+    _ensure_system_path()
     try:
         # WAVESHARE DRIVER IMPORT — change epd7in5_V2 if you have a different version
         from waveshare_epd import epd7in5_V2 as epd_driver
-    except ImportError:
-        print("[display] waveshare_epd not found — falling back to dev mode.")
+    except (ImportError, RuntimeError) as exc:
+        print(f"[display] waveshare_epd unavailable ({exc}) — falling back to dev mode.")
         DEV_MODE = True
 
 # ---------------------------------------------------------------------------
