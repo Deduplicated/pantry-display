@@ -245,15 +245,17 @@ h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 14px; }
 .items-columns-header .col-name { flex: 1; min-width: 0; }
 .items-columns-header .col-use-by,
 .items-columns-header .col-expiry {
-  width: 4.5rem;
+  width: 4.75rem;
   text-align: right;
+  font-weight: 700;
+  color: var(--color-text);
 }
 .items-columns-header .col-actions { width: 5.5rem; }
 
 .item-row {
   display: flex;
-  align-items: center;
-  padding: 9px 0;
+  align-items: flex-end;
+  padding: 10px 0 12px;
   border-bottom: 1px solid var(--color-border);
   gap: 6px;
 }
@@ -261,12 +263,15 @@ h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 14px; }
 .item-row:last-child { border-bottom: none; }
 
 .item-date {
-  font-size: 0.82rem;
-  color: var(--color-muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text);
   white-space: nowrap;
-  width: 4.5rem;
+  width: 4.75rem;
   text-align: right;
   flex-shrink: 0;
+  padding-bottom: 4px;
+  line-height: 1.2;
 }
 
 .item-actions {

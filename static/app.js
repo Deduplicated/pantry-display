@@ -204,7 +204,7 @@ async function deleteItem(id, name) {
     if (!res.ok) throw new Error("Delete failed");
     showToast(`"${name}" removed`);
     loadItems();
-    refreshPreview();
+    schedulePreviewRefresh();
   } catch (err) {
     showToast(err.message, true);
   }
@@ -231,7 +231,7 @@ function openEditDates(item) {
     .then(() => {
       showToast(`"${item.name}" updated`);
       loadItems();
-      refreshPreview();
+      schedulePreviewRefresh();
     })
     .catch((err) => showToast(err.message, true));
 }
@@ -243,7 +243,7 @@ async function triggerDisplayRefresh() {
   try {
     await fetch("/api/refresh-display", { method: "POST" });
     showToast("Display refresh triggered");
-    setTimeout(refreshPreview, 1500);
+    schedulePreviewRefresh();
   } catch {
     showToast("Refresh failed", true);
   } finally {
@@ -256,6 +256,13 @@ function refreshPreview() {
   const img = document.getElementById("preview-img");
   if (!img) return;
   img.src = `/preview.png?t=${Date.now()}`;
+}
+
+/** Re-fetch preview after background e-paper refresh (render saves PNG first). */
+function schedulePreviewRefresh() {
+  refreshPreview();
+  setTimeout(refreshPreview, 800);
+  setTimeout(refreshPreview, 2500);
 }
 
 function initPreview() {
@@ -366,7 +373,7 @@ function initForm() {
       useByManual = false;
       hintEl.textContent = "";
       loadItems();
-      refreshPreview();
+      schedulePreviewRefresh();
     } catch (err) {
       showToast(err.message, true);
     } finally {

@@ -92,7 +92,9 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
 FONT_TITLE   = _load_font(36, bold=True)
 FONT_SECTION = _load_font(22, bold=True)
 FONT_ITEM    = _load_font(22, bold=False)
+FONT_DATE    = _load_font(22, bold=True)   # Use by / Expiry columns
 FONT_SMALL   = _load_font(18, bold=False)
+FONT_COL_HDR = _load_font(18, bold=True)   # column headers
 
 # ---------------------------------------------------------------------------
 # Grouping logic
@@ -155,9 +157,10 @@ MARGIN_X      = 24   # left/right page margin
 MARGIN_TOP    = 16   # top margin
 TITLE_H       = 48   # height reserved for the main title
 SECTION_H     = 32   # height of a section header row
-ITEM_H        = 28   # height of an item row
+ITEM_H        = 32   # height of an item row (extra space for date padding)
 FOOTER_H      = 24   # height of the footer line
 COL_HEADER_Y_OFFSET = 4
+DATE_Y_OFFSET = 6    # push dates down slightly within each row
 COL_USE_BY_X  = 500  # Use By column
 COL_EXPIRY_X  = 640  # Expiry Date column
 NAME_MAX_LEN  = 18   # shorter names to fit two date columns
@@ -187,8 +190,8 @@ def render_image(items: list[dict]) -> Image.Image:
     draw.line([(MARGIN_X, y - 4), (WIDTH - MARGIN_X, y - 4)], fill=0, width=2)
 
     # Column headers (Use By | Expiry Date)
-    draw.text((COL_USE_BY_X, y + COL_HEADER_Y_OFFSET), "Use By", font=FONT_SMALL, fill=0)
-    draw.text((COL_EXPIRY_X, y + COL_HEADER_Y_OFFSET), "Expiry date", font=FONT_SMALL, fill=0)
+    draw.text((COL_USE_BY_X, y + COL_HEADER_Y_OFFSET), "Use By", font=FONT_COL_HDR, fill=0)
+    draw.text((COL_EXPIRY_X, y + COL_HEADER_Y_OFFSET), "Expiry date", font=FONT_COL_HDR, fill=0)
     y += 22
 
     # --- Sections ---
@@ -222,9 +225,10 @@ def render_image(items: list[dict]) -> Image.Image:
 
             # Item name (truncate long names)
             display_name = name if len(name) <= NAME_MAX_LEN else name[: NAME_MAX_LEN - 1] + "…"
+            date_y = y + DATE_Y_OFFSET
             draw.text((MARGIN_X + 8, y + 2), display_name, font=FONT_ITEM, fill=0)
-            draw.text((COL_USE_BY_X, y + 2), _format_date(use_by), font=FONT_ITEM, fill=0)
-            draw.text((COL_EXPIRY_X, y + 2), _format_date(expiry), font=FONT_ITEM, fill=0)
+            draw.text((COL_USE_BY_X, date_y), _format_date(use_by), font=FONT_DATE, fill=0)
+            draw.text((COL_EXPIRY_X, date_y), _format_date(expiry), font=FONT_DATE, fill=0)
 
             y += ITEM_H
             total_rendered += 1
@@ -247,8 +251,7 @@ def render_image(items: list[dict]) -> Image.Image:
 def push_to_display(img: Image.Image) -> None:
     """Send the rendered image to the Waveshare e-paper display."""
     if DEV_MODE:
-        img.save(PREVIEW_PATH)
-        print(f"[display] Dev mode — saved preview to {PREVIEW_PATH}")
+        print("[display] Dev mode — preview already saved, skipping hardware.")
         return
 
     epd = epd_driver.EPD()
@@ -271,8 +274,11 @@ def push_to_display(img: Image.Image) -> None:
 # ---------------------------------------------------------------------------
 
 def refresh_display(items: list[dict]) -> None:
-    """Render the current items list and push to e-paper (or save preview)."""
+    """Render, save web preview, then push to e-paper (or dev-mode preview only)."""
     img = render_image(items)
+    # Always write preview.png so the phone UI matches the latest render.
+    img.save(PREVIEW_PATH)
+    print(f"[display] Preview saved to {PREVIEW_PATH}")
     push_to_display(img)
 
 

@@ -148,7 +148,7 @@ def refresh_display():
 
 @app.route("/preview.png")
 def preview_image():
-    """Serve the latest rendered preview image (useful in dev mode)."""
+    """Serve the latest rendered preview image (updated on every display refresh)."""
     preview_path = disp.PREVIEW_PATH
     if not os.path.exists(preview_path):
         items = db.get_all_items()
@@ -156,7 +156,9 @@ def preview_image():
 
     directory = os.path.dirname(preview_path)
     filename = os.path.basename(preview_path)
-    return send_from_directory(directory, filename, mimetype="image/png")
+    response = send_from_directory(directory, filename, mimetype="image/png")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return response
 
 
 @app.route("/api/defaults", methods=["GET"])
