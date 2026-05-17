@@ -162,13 +162,31 @@ FOOTER_H      = 24   # height of the footer line
 COL_HEADER_Y_OFFSET = 4
 COL_HEADER_ROW_H    = 22   # height for header text
 COL_HEADER_GAP      = 14   # space below headers before section bar
-DATE_Y_OFFSET = 6    # push dates down slightly within each row
 COL_USE_BY_X  = 500  # Use By column
 COL_EXPIRY_X  = 640  # Expiry Date column
 NAME_MAX_LEN  = 18   # shorter names to fit two date columns
 
 # Maximum items we will render before truncating (keeps layout from overflowing)
 MAX_ITEMS = 12
+
+
+def _row_center_y(row_top: int, row_height: int = ITEM_H) -> int:
+    """Vertical centre of a row for anchor='lm' text."""
+    return row_top + row_height // 2
+
+
+def _draw_text_centred(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    row_top: int,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    *,
+    fill: int = 0,
+    row_height: int = ITEM_H,
+) -> None:
+    """Draw text vertically centred in a row (left-middle anchor)."""
+    draw.text((x, _row_center_y(row_top, row_height)), text, font=font, fill=fill, anchor="lm")
 
 
 def render_image(items: list[dict]) -> Image.Image:
@@ -191,9 +209,10 @@ def render_image(items: list[dict]) -> Image.Image:
     # Thin horizontal rule under the title
     draw.line([(MARGIN_X, y - 4), (WIDTH - MARGIN_X, y - 4)], fill=0, width=2)
 
-    # Column headers (Use By | Expiry Date)
-    draw.text((COL_USE_BY_X, y + COL_HEADER_Y_OFFSET), "Use By", font=FONT_COL_HDR, fill=0)
-    draw.text((COL_EXPIRY_X, y + COL_HEADER_Y_OFFSET), "Expiry date", font=FONT_COL_HDR, fill=0)
+    # Column headers (Use By | Expiry Date), centred in header band
+    header_mid = y + COL_HEADER_ROW_H // 2
+    draw.text((COL_USE_BY_X, header_mid), "Use By", font=FONT_COL_HDR, fill=0, anchor="lm")
+    draw.text((COL_EXPIRY_X, header_mid), "Expiry date", font=FONT_COL_HDR, fill=0, anchor="lm")
     y += COL_HEADER_ROW_H + COL_HEADER_GAP
 
     # --- Sections ---
@@ -209,7 +228,13 @@ def render_image(items: list[dict]) -> Image.Image:
 
         # Section header with filled background bar
         draw.rectangle([(MARGIN_X, y), (WIDTH - MARGIN_X, y + SECTION_H - 2)], fill=0)
-        draw.text((MARGIN_X + 6, y + 4), section_name, font=FONT_SECTION, fill=1)
+        draw.text(
+            (MARGIN_X + 6, _row_center_y(y, SECTION_H)),
+            section_name,
+            font=FONT_SECTION,
+            fill=1,
+            anchor="lm",
+        )
         y += SECTION_H
 
         for name, use_by, expiry, _days in entries:
@@ -225,12 +250,11 @@ def render_image(items: list[dict]) -> Image.Image:
                 y += ITEM_H
                 break
 
-            # Item name (truncate long names)
+            # Item row: same 22px size; dates bold only; all vertically centred in ITEM_H
             display_name = name if len(name) <= NAME_MAX_LEN else name[: NAME_MAX_LEN - 1] + "…"
-            date_y = y + DATE_Y_OFFSET
-            draw.text((MARGIN_X + 8, y + 2), display_name, font=FONT_ITEM, fill=0)
-            draw.text((COL_USE_BY_X, date_y), _format_date(use_by), font=FONT_DATE, fill=0)
-            draw.text((COL_EXPIRY_X, date_y), _format_date(expiry), font=FONT_DATE, fill=0)
+            _draw_text_centred(draw, MARGIN_X + 8, y, display_name, FONT_ITEM)
+            _draw_text_centred(draw, COL_USE_BY_X, y, _format_date(use_by), FONT_DATE)
+            _draw_text_centred(draw, COL_EXPIRY_X, y, _format_date(expiry), FONT_DATE)
 
             y += ITEM_H
             total_rendered += 1
